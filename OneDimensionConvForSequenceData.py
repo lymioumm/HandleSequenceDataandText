@@ -16,6 +16,7 @@ class IMDBCnn(nn.Module):
         self.hidden_size = hidden_size
         self.bs = bs
         self.e = nn.Embedding(n_vocab,hidden_size)
+        # self.cnn_N = nn.Conv1d(2*max_len,max_len,kernel_size)
         self.cnn = nn.Conv1d(max_len,hidden_size,kernel_size)
         self.avg = nn.AdaptiveAvgPool1d(10)
         self.fc = nn.Linear(1000,n_cat)
@@ -29,8 +30,9 @@ class IMDBCnn(nn.Module):
         cnn_o = self.cnn(e_out)
         cnn_avg = self.avg(cnn_o)
         cnn_avg = cnn_avg.view(self.bs,-1)
-        fc = F.dropout(self.fc(cnn_avg),p=0.5)
-        return self.softmax(fc)
+        # fc = F.dropout(self.fc(cnn_avg),p=0.2)   # 结果显示p = 0.2时，训练结果好
+        # return self.softmax(fc)
+        return self.softmax(cnn_avg)      # 不加池化层时效果更好
 
 def fit(epoch, model, data_loader, phase='training', volatile=False):
         if phase == 'training':
