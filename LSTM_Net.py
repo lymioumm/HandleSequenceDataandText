@@ -95,7 +95,7 @@ def achieve():
     test_iter.repeat = False
 
     n_vocab = len(TEXT.vocab)
-    n_hidden = 100
+    n_hidden = 100   # 初始为100
     model = IMDBRnn(n_vocab,n_hidden,3,bs=32)    # 这一步主要进行模型IMDBRnn的__init__
     model = model.cuda()
     train_losses,train_accuracy = [],[]

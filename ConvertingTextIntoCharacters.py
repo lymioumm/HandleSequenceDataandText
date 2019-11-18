@@ -3,6 +3,8 @@ import numpy as np
 import os
 from nltk import ngrams
 from torch import nn, optim
+import torch.nn as nn
+from torch.autograd import Variable
 from torch.optim import optimizer
 from torchtext import data, datasets
 from torchtext.vocab import GloVe
@@ -115,8 +117,8 @@ class EmbNet(nn.Module):
         self.fc = nn.Linear(hidden_size2, 3)
 
     def forward(self, x):
-        y = x.size(0)
-        y1 = x.size(1)
+        y = x.size(0)    # 128
+        y1 = x.size(1)   # 20
         # y2 = x.size(2)   # IndexError: Dimension out of range (expected to be in range of [-2, 1], but got 2)
         embeds = self.embedding(x).view(x.size(0), -1)
         out = self.fc(embeds)
@@ -132,7 +134,10 @@ def fit(epoch,model,data_loader,phase = 'training',volatile = False):
         volatile = True
     running_loss = 0.0
     running_correct = 0
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)   # 训练效果比SGD好
+    # optimizer = optim.SGD(model.parameters(), lr=0.001)
+    # optimizer = optim.SGD([param for param in model.parameters() if param.requires_grad == True], lr=0.001)
+
 
     for batch_idx,batch in enumerate(data_loader):
         text,target = batch.text,batch.label
@@ -163,6 +168,14 @@ def achieve_():
     train_iter,test_iter = data.BucketIterator.splits((train,test),batch_size = 128,device = -1,shuffle = True)
     lens = len(TEXT.vocab.stoi)
     model = EmbNet(len(TEXT.vocab.stoi), 10).to(device)   # model 必须在构建字典后定义
+
+    # model = EmbNet(len(TEXT.vocab.stoi), 300, 12000).to(device)
+    # model.embedding.weight.data = TEXT.vocab.vectors  # requires_grad = True
+    # model.embedding.weight.requires_grad = False
+
+
+    # optimizer = optim.SGD([param for param in model.parameters() if param.requires_grad == True], lr=0.001)
+
     train_losses,train_accuracy = [],[]
     val_losses,val_accuracy = [],[]
     train_iter.repeat = False
@@ -188,11 +201,59 @@ def achieve_():
     plt.legend()
     plt.savefig('Text_accuracy')
 
+# Using pretrained word embeddings
+def pretrain_():
+    # Downloading the embeddings
+    TEXT = data.Field(lower=True, batch_first=True, fix_length=20)
+    LABEL = data.Field(sequential=False)
+    train,test = datasets.IMDB.splits(TEXT,LABEL)
+    TEXT.build_vocab(train,vectors = GloVe(name='6B',dim = 300),max_size = 10000,min_freq = 10)
+    LABEL.build_vocab(train,)
+    vectors = TEXT.vocab.vectors
+    model = EmbNet(len(TEXT.vocab.stoi),300,12000)
+    model.embedding.weight.data = TEXT.vocab.vectors   # requires_grad = True
+    model.embedding.weight.requires_grad = False
+    optimizer = optim.SGD([param for param in model.parameters() if param.requires_grad == True],lr = 0.001)
+    pass
+
+class RNN(nn.Module):
+    def __init__(self,input_size,hidden_size,output_size):
+        super(RNN,self).__init__()
+        self.hidden_size = hidden_size
+        self.i2h = nn.Linear(input_size + hidden_size,hidden_size)
+        self.i2o = nn.Linear(input_size + hidden_size,output_size)
+        self.softmax = nn.LogSoftmax(dim = 1)
+
+    def forward(self,input,hidden):
+        combined = torch.cat((input,hidden),1)
+        hidden = self.i2h(combined)
+        output = self.i2o(combined)
+        output = self.softmax(output)
+        return output,hidden
+
+    def initHidden(self):
+        return Variable(torch.zeros(1,self.hidden_size))
+
+def achieve_RNN():
+    Thor_review = 'the action scenes were top notch in this movie. Thor has never been ' \
+                  'this epic in the MCU. He does some pretty epic sh*t in this movie and' \
+                  ' he is definitely not under-powered anymore. Thor in unleashed in this,' \
+                  ' I love that.'
+    len_ = len(Thor_review)
+    rnn = RNN(input_size = len(Thor_review), hidden_size = 10, output_size = 10)
+    hidden = 10
+    for i in range(len(Thor_review)):
+        output,hidden = rnn(Thor_review[i],hidden)
+
+
+    pass
 
 def main():
     # dic_()
     # IMDB_()
     achieve_()
+    # pretrain_()
+    # achieve_RNN()
     pass
 
 if __name__ == '__main__':
